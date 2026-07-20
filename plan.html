@@ -40,9 +40,6 @@ header{
 .hdr-row{display:flex; justify-content:space-between; align-items:flex-start; gap:12px;}
 .hdr-title{font-size:17px; font-weight:700; letter-spacing:-0.01em;}
 .hdr-sub{font-size:12px; color:var(--text-2); margin-top:2px;}
-.countdown{text-align:right; flex-shrink:0;}
-.countdown .num{font-size:20px; font-weight:700; color:var(--teal); font-family:'JetBrains Mono',monospace;}
-.countdown .lbl{font-size:10px; color:var(--text-3); text-transform:uppercase; letter-spacing:0.06em;}
 .dots{display:flex; gap:5px; margin-top:10px;}
 .dot{width:8px; height:8px; border-radius:50%; background:var(--border); flex:1; max-width:20px;}
 .dot.done{background:var(--teal-dim);}
@@ -235,6 +232,18 @@ nav.bottom button.active .ic{background:var(--teal);}
 .meal-hdr h4{font-size:13px; margin:0; color:var(--text);}
 .meal-hdr span{font-size:10px; color:var(--text-3); font-family:'JetBrains Mono',monospace;}
 
+.collapse-hdr{cursor:pointer; display:flex; justify-content:space-between; align-items:center; user-select:none;}
+.collapse-hdr .chev{color:var(--text-3); transition:transform .15s; font-size:12px; flex-shrink:0; margin-left:8px;}
+.collapse-hdr.open .chev{transform:rotate(180deg);}
+.collapsible-content{overflow:hidden;}
+.collapsible-content.collapsed{display:none;}
+.meal-block{border-bottom:1px solid var(--border); padding:12px 0;}
+.meal-block:last-child{border-bottom:none;}
+.meal-block .collapse-hdr{padding:2px 0;}
+.meal-block .collapse-hdr h4{font-size:14px; margin:0; font-weight:600;}
+.meal-block .collapse-hdr span.macros{font-size:10px; color:var(--text-3); font-family:'JetBrains Mono',monospace; margin-right:6px;}
+.meal-block .opts-wrap{margin-top:8px;}
+
 .sup-row{padding:10px 0; border-bottom:1px solid var(--border);}
 .sup-row:last-child{border-bottom:none;}
 .sup-row .name{font-size:13px; font-weight:600;}
@@ -305,6 +314,15 @@ nav.bottom button.active .ic{background:var(--teal);}
     </div>
 
     <div class="card">
+      <h2>Progress report</h2>
+      <p class="sub">Snapshot of maxes, weight, and adherence — email it to yourself or download it to use as your starting point for the next cycle.</p>
+      <div class="day-toolbar">
+        <button class="btn-start" onclick="emailReport()">✉ Email report</button>
+        <button class="btn-done" onclick="downloadReport()">⬇ Download .txt</button>
+      </div>
+    </div>
+
+    <div class="card">
       <h2>Phase map</h2>
       <div id="phaseMap"></div>
     </div>
@@ -332,18 +350,30 @@ nav.bottom button.active .ic{background:var(--teal);}
       </div>
     </div>
     <div class="card">
-      <h2>Meal template</h2>
-      <p class="sub">3 options per slot — swap freely, built to the same macros.</p>
-      <div id="mealTemplate"></div>
+      <div class="collapse-hdr open" data-toggle="catMeals" onclick="toggleCollapse('catMeals', this)">
+        <h2 style="margin:0;">Meal template</h2><span class="chev">⌄</span>
+      </div>
+      <p class="sub">5 options per slot — swap freely. All budget-friendly &amp; available at Esselunga.</p>
+      <div id="catMeals" class="collapsible-content">
+        <div id="mealTemplate"></div>
+      </div>
     </div>
     <div class="card">
-      <h2>Core supplements</h2>
-      <div id="supCore"></div>
+      <div class="collapse-hdr" data-toggle="catCoreSup" onclick="toggleCollapse('catCoreSup', this)">
+        <h2 style="margin:0;">Core supplements</h2><span class="chev">⌄</span>
+      </div>
+      <div id="catCoreSup" class="collapsible-content collapsed">
+        <div id="supCore"></div>
+      </div>
     </div>
     <div class="card">
-      <h2>Knee support</h2>
+      <div class="collapse-hdr" data-toggle="catKneeSup" onclick="toggleCollapse('catKneeSup', this)">
+        <h2 style="margin:0;">Knee support</h2><span class="chev">⌄</span>
+      </div>
       <p class="sub">Evidence is modest — helps at the margins, not a fix on its own.</p>
-      <div id="supKnee"></div>
+      <div id="catKneeSup" class="collapsible-content collapsed">
+        <div id="supKnee"></div>
+      </div>
     </div>
   </section>
 
@@ -391,8 +421,13 @@ nav.bottom button.active .ic{background:var(--teal);}
     </div>
     <div class="card">
       <h2>Trend</h2>
+      <p class="sub">Grey dots = what the scale said. Green line = smoothed trend (filters daily water-weight noise).</p>
       <div style="position:relative; width:100%; height:220px;">
-        <canvas id="weightChart" role="img" aria-label="Line chart of bodyweight over time">Bodyweight trend chart</canvas>
+        <canvas id="weightChart" role="img" aria-label="Line chart of bodyweight trend over time with scale weight points">Bodyweight trend chart</canvas>
+      </div>
+      <div style="display:flex; gap:16px; margin-top:10px; font-size:11px; color:var(--text-2);">
+        <span style="display:flex;align-items:center;gap:4px;"><span style="width:14px;height:2px;background:#2bbf95;"></span>Trend</span>
+        <span style="display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:50%;background:#9fada5;"></span>Scale</span>
       </div>
     </div>
     <div class="card">
@@ -590,28 +625,38 @@ const WARMUP_SECTIONS = [
 const MEAL_OPTIONS = [
   ['Breakfast','450 kcal · 45g P · 35g C · 15g F',[
     '3 whole eggs + 3 egg whites, 40g oats, handful berries',
-    '250g 0% Greek yogurt/skyr + 40g granola + 1 scoop whey mixed in',
+    '250g 0% Greek yogurt (yogurt greco) + 40g oats + 1 scoop whey mixed in',
     'Protein pancakes: 1 scoop whey + 2 whole eggs + 40g oats blended, topped with berries',
+    '200g fiocchi di latte (or ricotta magra) + 40g oats + 1 banana',
+    '3 fette biscottate integrali + 4 scrambled eggs + cherry tomatoes',
   ]],
   ['Lunch','550 kcal · 55g P · 45g C · 18g F',[
-    '180g chicken breast, 150g rice, mixed veg, drizzle olive oil',
-    '200g turkey or lean beef mince, 150g potatoes, side salad, olive oil dressing',
-    '200g white fish or tuna, 150g couscous or quinoa, roasted vegetables, olive oil',
+    '180g chicken breast (petto di pollo), 150g rice, mixed veg, drizzle olive oil',
+    '200g turkey breast (fesa di tacchino) or lean beef mince, 150g potatoes, side salad, olive oil',
+    '200g white fish or canned tuna, 150g couscous or quinoa, roasted vegetables, olive oil',
+    '2 cans tuna in water (160g drained), 150g rice or whole-wheat pasta, frozen mixed veg, olive oil',
+    '200g chicken or turkey breast, 150g canned lentils or chickpeas, vegetables',
   ]],
   ['Shake','250 kcal · 35g P · 20g C · 5g F',[
     '1 scoop whey + water/skim milk, 1 banana or 30g rice cakes',
     '1 scoop whey + 200ml skim milk + 30g oats, blended',
-    '250g low-fat cottage cheese + small handful berries',
+    '250g fiocchi di latte (low-fat cottage-style cheese) + small handful berries',
+    '250ml skim milk + 1 tbsp cocoa powder + 1 scoop whey, blended',
+    '2 hard-boiled eggs + 1 piece of fruit',
   ]],
   ['Dinner','600 kcal · 55g P · 25g C · 30g F',[
-    '200g salmon or lean beef, roasted veg, small potatoes, olive oil',
-    '200g pork tenderloin or chicken thigh, sweet potato, greens, avocado',
-    '200g lean steak or lamb, lentils or chickpeas, salad, olive oil',
+    '200g frozen white fish or canned mackerel/sardines, boiled potatoes, vegetables, olive oil',
+    '200g chicken thigh or pork loin, sweet or regular potatoes, greens, olive oil',
+    '200g lean beef or turkey mince, canned lentils or chickpeas, salad, olive oil',
+    '2 eggs + 100g primo sale or light cheese, grilled vegetables, whole-wheat bread',
+    '200g canned mackerel or sardines, boiled potatoes, vegetables',
   ]],
   ['Evening (if hungry)','200 kcal · 30g P · 10g C · 7g F',[
-    '250g cottage cheese or Greek yogurt + small handful nuts',
-    '1 scoop casein shake + a few almonds',
-    '2 boiled eggs + 100g low-fat cottage cheese',
+    '250g fiocchi di latte or Greek yogurt + small handful nuts',
+    '1 scoop casein (or whey) shake + a few almonds',
+    '2 boiled eggs + 100g fiocchi di latte',
+    '150g Greek yogurt + 1 tsp honey + walnuts',
+    '100g fiocchi di latte + 2 rice cakes',
   ]],
 ];
 const SUP_CORE = [
@@ -736,9 +781,9 @@ function renderHeader(){
   const now = new Date();
   const daysLeft = Math.max(0, Math.ceil((target-now)/86400000));
 
-  const sorted = [...weightLog].sort((a,b)=> a.date.localeCompare(b.date));
-  const currentW = sorted.length ? sorted[sorted.length-1].weight : null;
-  const startW = sorted.length ? sorted[0].weight : null;
+  const series = buildWeightSeries();
+  const currentW = series.trend.length ? series.trend[series.trend.length-1] : null;
+  const startW = series.trend.length ? series.trend[0] : null;
   const lostW = (startW!=null && currentW!=null) ? (startW-currentW) : null;
 
   const totalSlots = 8*6;
@@ -747,7 +792,7 @@ function renderHeader(){
 
   document.getElementById('hdrStats').innerHTML = `
     <div class="stat"><div class="v">${daysLeft}</div><div class="l">days left</div></div>
-    <div class="stat"><div class="v">${currentW!=null ? currentW : '—'}</div><div class="l">weight kg</div></div>
+    <div class="stat"><div class="v">${currentW!=null ? currentW.toFixed(1) : '—'}</div><div class="l">trend kg</div></div>
     <div class="stat"><div class="v">${lostW!=null ? lostW.toFixed(1) : '—'}</div><div class="l">kg lost</div></div>
     <div class="stat"><div class="v">${pctDone}%</div><div class="l">done</div></div>`;
 
@@ -819,6 +864,11 @@ const DAY_SHORT = {Sunday:'Sun',Monday:'Mon',Tuesday:'Tue',Wednesday:'Wed',Thurs
 
 function exLogKey(week, day, idx){ return `w${week}_${day}_${idx}`; }
 function dayDoneKey(week, day){ return `${week}_${day}`; }
+function toggleCollapse(id, hdrEl){
+  const el = document.getElementById(id);
+  el.classList.toggle('collapsed');
+  if(hdrEl) hdrEl.classList.toggle('open');
+}
 
 function parseSetsCount(text){
   if(!text) return 1;
@@ -936,7 +986,6 @@ function renderProgram(){
       <button class="btn-done ${done?'done':''}" onclick="toggleDayDone()">${done?'✓ Done':'Mark done'}</button>
     </div>`;
 
-  let lastTag = null;
   items.forEach(row=>{
     const savedVal = exLog[row.key] ?? '';
     const setsCount = parseSetsCount(row.setsReps);
@@ -1042,10 +1091,19 @@ function renderLive(){
 
 /* ---------------- RENDER: NUTRITION ---------------- */
 function renderNutrition(){
-  document.getElementById('mealTemplate').innerHTML = MEAL_OPTIONS.map(([name,macros,opts])=>`
-    <div class="meal-hdr"><h4>${name}</h4><span>${macros}</span></div>
-    ${opts.map(o=>`<div class="meal-opt">${o}</div>`).join('')}
-  `).join('');
+  document.getElementById('mealTemplate').innerHTML = MEAL_OPTIONS.map(([name,macros,opts],i)=>{
+    const id = 'meal_'+i;
+    return `
+    <div class="meal-block">
+      <div class="collapse-hdr" data-toggle="${id}" onclick="toggleCollapse('${id}', this)">
+        <h4>${name}</h4>
+        <span><span class="macros">${macros}</span><span class="chev">⌄</span></span>
+      </div>
+      <div id="${id}" class="collapsible-content collapsed opts-wrap">
+        ${opts.map(o=>`<div class="meal-opt">${o}</div>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
   document.getElementById('supCore').innerHTML = SUP_CORE.map(([n,d,w])=>`
     <div class="sup-row"><div class="name">${n}</div><div class="dose">${d}</div><div class="why">${w}</div></div>
   `).join('');
@@ -1091,23 +1149,66 @@ function renderGuide(){
 }
 
 /* ---------------- RENDER: WEIGHT LOG ---------------- */
+/* Build a daily series with linear interpolation for gaps, then an
+   exponentially-smoothed trend line — same approach MacroFactor/Trendweight
+   use to separate real fat-loss trend from daily water-weight noise. */
+function buildWeightSeries(){
+  const sorted = [...weightLog].sort((a,b)=> a.date.localeCompare(b.date));
+  if(sorted.length===0) return {dates:[], scale:[], trend:[]};
+  const rawByDate = {};
+  sorted.forEach(e=>{ rawByDate[e.date] = e.weight; });
+
+  const start = new Date(sorted[0].date+'T00:00:00');
+  const end = new Date(sorted[sorted.length-1].date+'T00:00:00');
+  const days = Math.round((end-start)/86400000)+1;
+  const dates = [];
+  for(let i=0;i<days;i++){
+    dates.push(new Date(start.getTime()+i*86400000).toISOString().slice(0,10));
+  }
+  const knownIdx = dates.map((d,i)=> rawByDate[d]!=null ? i : -1).filter(i=>i>=0);
+
+  const interpolated = [];
+  const scale = [];
+  dates.forEach((d,i)=>{
+    if(rawByDate[d]!=null){ interpolated.push(rawByDate[d]); scale.push(rawByDate[d]); return; }
+    scale.push(null);
+    const prev = [...knownIdx].reverse().find(k=>k<i);
+    const next = knownIdx.find(k=>k>i);
+    if(prev!=null && next!=null){
+      const frac = (i-prev)/(next-prev);
+      interpolated.push(rawByDate[dates[prev]] + frac*(rawByDate[dates[next]]-rawByDate[dates[prev]]));
+    } else if(prev!=null) interpolated.push(rawByDate[dates[prev]]);
+    else interpolated.push(rawByDate[dates[next]]);
+  });
+
+  const alpha = 0.1; // ~10-day smoothing window, matches standard trend-weight algorithms
+  const trend = [];
+  let t = interpolated[0];
+  interpolated.forEach((v,i)=>{
+    t = (i===0) ? v : t + alpha*(v-t);
+    trend.push(Math.round(t*10)/10);
+  });
+  return {dates, scale, trend};
+}
+
 let weightChartInstance = null;
 function renderWeight(){
+  const series = buildWeightSeries();
   const sorted = [...weightLog].sort((a,b)=> a.date.localeCompare(b.date));
   const stats = document.getElementById('weightStats');
   if(sorted.length===0){
     stats.innerHTML = `<div class="stat" style="grid-column:1/-1;"><div class="l">No entries yet</div></div>`;
   } else {
-    const start = sorted[0].weight;
-    const latest = sorted[sorted.length-1].weight;
-    const change = (latest-start).toFixed(1);
-    const days = Math.max(1, (new Date(sorted[sorted.length-1].date) - new Date(sorted[0].date))/86400000);
-    const perWeek = ((latest-start)/(days/7)).toFixed(2);
+    const scaleLatest = sorted[sorted.length-1].weight;
+    const trendLatest = series.trend[series.trend.length-1];
+    const trendStart = series.trend[0];
+    const totalDays = Math.max(1, series.dates.length-1);
+    const trendPerWeek = ((trendLatest-trendStart)/(totalDays/7)).toFixed(2);
     stats.innerHTML = `
-      <div class="stat"><div class="v">${start}</div><div class="l">start (kg)</div></div>
-      <div class="stat"><div class="v">${latest}</div><div class="l">latest (kg)</div></div>
-      <div class="stat"><div class="v">${change}</div><div class="l">change</div></div>
-      <div class="stat"><div class="v">${perWeek}</div><div class="l">avg/week</div></div>`;
+      <div class="stat"><div class="v">${scaleLatest}</div><div class="l">scale (kg)</div></div>
+      <div class="stat"><div class="v">${trendLatest.toFixed(1)}</div><div class="l">trend (kg)</div></div>
+      <div class="stat"><div class="v">${(trendLatest-trendStart).toFixed(1)}</div><div class="l">trend change</div></div>
+      <div class="stat"><div class="v">${trendPerWeek}</div><div class="l">trend/week</div></div>`;
   }
   const table = document.getElementById('weightTable');
   const rows = [...weightLog].sort((a,b)=> b.date.localeCompare(a.date));
@@ -1125,20 +1226,26 @@ function renderWeight(){
     weightChartInstance = new Chart(ctx, {
       type: 'line',
       data: {
-        labels: sorted.map(e=>e.date.slice(5)),
-        datasets: [{
-          data: sorted.map(e=>e.weight),
-          borderColor: '#2bbf95', backgroundColor: 'rgba(43,191,149,0.1)',
-          borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#2bbf95',
-          fill: true, tension: 0.25,
-        }]
+        labels: series.dates.map(d=>d.slice(5)),
+        datasets: [
+          {
+            label: 'Trend', data: series.trend,
+            borderColor: '#2bbf95', backgroundColor: 'rgba(43,191,149,0.08)',
+            borderWidth: 2, pointRadius: 0, fill: true, tension: 0.15, spanGaps: true,
+          },
+          {
+            label: 'Scale', data: series.scale,
+            borderColor: 'transparent', showLine: false,
+            pointRadius: 3, pointBackgroundColor: '#9fada5', pointBorderColor: 'transparent',
+          },
+        ]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
         plugins: { legend: { display:false } },
         scales: {
           y: { grid:{ color:'#26302b' }, ticks:{ color:'#9fada5', font:{size:10} } },
-          x: { grid:{ display:false }, ticks:{ color:'#9fada5', font:{size:9}, maxRotation:45, autoSkip:true } }
+          x: { grid:{ display:false }, ticks:{ color:'#9fada5', font:{size:9}, maxRotation:45, autoSkip:true, maxTicksLimit:10 } }
         }
       }
     });
@@ -1244,6 +1351,72 @@ function renderExChart(){
   document.getElementById('exChartLegend').innerHTML = `
     <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#2bbf95;"></span>Logged</span>
     ${hasTarget ? `<span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:2px;background:#e0a458;"></span>Target</span>` : ''}`;
+}
+
+/* ---------------- PROGRESS REPORT ---------------- */
+function generateReportText(){
+  const now = new Date();
+  const lines = [];
+  lines.push('SUMMER SHRED — 8-WEEK PROGRESS REPORT');
+  lines.push('Generated: ' + now.toLocaleDateString());
+  lines.push('');
+  lines.push('-- MAXES (current, entered on Dashboard) --');
+  lines.push(`Trap Bar Deadlift: ${maxes.deadlift || '\u2014'} kg`);
+  lines.push(`Flat Bench Press: ${maxes.bench || '\u2014'} kg`);
+  lines.push(`Narrow Stance Squat Variation: ${maxes.squat || '\u2014'} kg`);
+  lines.push(`Pull-Ups (max, strict): ${maxes.pullups || '\u2014'} reps`);
+  lines.push('');
+  lines.push('-- LAST LOGGED WORKING WEIGHTS --');
+  const mainLifts = [
+    ['Trap Bar Deadlift','Monday',3],
+    ['Flat Bench Press','Tuesday',3],
+    ['Narrow Stance Squat Variation','Wednesday',3],
+  ];
+  mainLifts.forEach(([name,day,idx])=>{
+    let found = null;
+    for(let w=8; w>=1; w--){
+      const raw = exLog[exLogKey(w,day,idx)];
+      if(raw){ found = {w, raw}; break; }
+    }
+    lines.push(`${name}: ${found ? found.raw + ' (Week '+found.w+')' : 'not logged'}`);
+  });
+  lines.push('');
+  lines.push('-- BODYWEIGHT --');
+  const sorted = [...weightLog].sort((a,b)=>a.date.localeCompare(b.date));
+  if(sorted.length){
+    const start=sorted[0].weight, latest=sorted[sorted.length-1].weight;
+    lines.push(`Start: ${start} kg (${sorted[0].date})`);
+    lines.push(`Latest: ${latest} kg (${sorted[sorted.length-1].date})`);
+    lines.push(`Change: ${(latest-start).toFixed(1)} kg`);
+  } else {
+    lines.push('No entries logged.');
+  }
+  lines.push('');
+  lines.push('-- ADHERENCE --');
+  const totalSlots = 8*6;
+  const doneCount = Object.values(dayDone).filter(Boolean).length;
+  lines.push(`Workouts completed: ${doneCount} / ${totalSlots} (${Math.round(doneCount/totalSlots*100)}%)`);
+  lines.push(`Current week: ${currentWeek} of 8`);
+  lines.push('');
+  lines.push('Use the maxes above (or the last logged working weights, whichever is more recent) as your starting point for the next cycle.');
+  return lines.join('\n');
+}
+function emailReport(){
+  const body = generateReportText();
+  const subject = 'Summer Shred — Progress Report';
+  window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+function downloadReport(){
+  const text = generateReportText();
+  const blob = new Blob([text], {type:'text/plain'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `summer-shred-report-${new Date().toISOString().slice(0,10)}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 /* ---------------- INIT ---------------- */
